@@ -1,0 +1,112 @@
+@import "tailwindcss";
+
+:root {
+  --background: #fffdfb;
+  --foreground: #3f3f46;
+  --panel: #ffffff;
+  --sidebar: #fff5f7;
+  --primary: #f35f72;
+  --primary-foreground: #ffffff;
+  --secondary: #fff0f3;
+  --secondary-foreground: #5c4850;
+  --muted: #fff5f7;
+  --muted-foreground: #70707a;
+  --border: #f6d7dd;
+  --input: #f1c9d1;
+  --ring: #3d73d9;
+  --destructive: #d63b4d;
+  --destructive-foreground: #ffffff;
+  --brand-blue: #3d73d9;
+  --brand-pink-soft: #ffe8ee;
+  --brand-ink: #22222a;
+}
+
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-panel: var(--panel);
+  --color-sidebar: var(--sidebar);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-secondary: var(--secondary);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-border: var(--border);
+  --color-input: var(--input);
+  --color-ring: var(--ring);
+  --color-destructive: var(--destructive);
+  --color-destructive-foreground: var(--destructive-foreground);
+  --color-brand-blue: var(--brand-blue);
+  --color-brand-pink-soft: var(--brand-pink-soft);
+  --color-brand-ink: var(--brand-ink);
+  --font-sans: var(--font-geist-sans);
+  --font-mono: var(--font-geist-mono);
+}
+
+.dark {
+  --background: #fffdfb;
+  --foreground: #3f3f46;
+  --panel: #ffffff;
+  --sidebar: #fff5f7;
+  --primary: #f35f72;
+  --primary-foreground: #ffffff;
+  --secondary: #fff0f3;
+  --secondary-foreground: #5c4850;
+  --muted: #fff5f7;
+  --muted-foreground: #70707a;
+  --border: #f6d7dd;
+  --input: #f1c9d1;
+  --ring: #3d73d9;
+  --destructive: #d63b4d;
+  --destructive-foreground: #ffffff;
+  --brand-blue: #3d73d9;
+  --brand-pink-soft: #ffe8ee;
+  --brand-ink: #22222a;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  background: var(--background);
+  color: var(--foreground);
+  font-family: var(--font-geist-sans), Arial, Helvetica, sans-serif;
+}
+
+body::before,
+body::after {
+  content: "";
+  position: fixed;
+  z-index: -1;
+  pointer-events: none;
+  border-radius: 999px 999px 0 0;
+  background: linear-gradient(180deg, rgba(255, 216, 225, 0.85), rgba(255, 216, 225, 0));
+  filter: blur(1px);
+}
+
+body::before {
+  left: 7vw;
+  top: 17vh;
+  width: 210px;
+  height: 58px;
+}
+
+body::after {
+  right: -20px;
+  top: 42vh;
+  width: 170px;
+  height: 72px;
+}
+
+button,
+textarea,
+input {
+  letter-spacing: 0;
+}
+
+::selection {
+  background: var(--brand-blue);
+  color: #ffffff;
+}

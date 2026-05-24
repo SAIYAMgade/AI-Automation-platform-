@@ -1,0 +1,78 @@
+services:
+  postgres:
+    image: pgvector/pgvector:pg16
+    environment:
+      POSTGRES_DB: bookleaf
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./supabase/schema.sql:/docker-entrypoint-initdb.d/01-schema.sql:ro
+      - ./supabase/mock-data.sql:/docker-entrypoint-initdb.d/02-mock-data.sql:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d bookleaf"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  redis:
+    image: redis:7-alpine
+    ports:
+      - "6379:6379"
+    command: ["redis-server", "--appendonly", "yes"]
+    volumes:
+      - redis_data:/data
+
+  app:
+    build: .
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_started
+    environment:
+      NODE_ENV: production
+      APP_URL: http://localhost:3000
+      DATABASE_URL: postgresql://postgres:postgres@postgres:5432/bookleaf?schema=public
+      REDIS_URL: redis://redis:6379
+      USE_MOCK_DATA: "false"
+      OPENAI_API_KEY: ${OPENAI_API_KEY:-}
+      OPENAI_MODEL: ${OPENAI_MODEL:-gpt-4.1}
+      OPENAI_EMBEDDING_MODEL: ${OPENAI_EMBEDDING_MODEL:-text-embedding-3-small}
+      NEXT_PUBLIC_SUPABASE_URL: ${NEXT_PUBLIC_SUPABASE_URL:-http://localhost:54321}
+      NEXT_PUBLIC_SUPABASE_ANON_KEY: ${NEXT_PUBLIC_SUPABASE_ANON_KEY:-}
+      SUPABASE_SERVICE_ROLE_KEY: ${SUPABASE_SERVICE_ROLE_KEY:-}
+      SENTRY_DSN: ${SENTRY_DSN:-}
+    ports:
+      - "3000:3000"
+
+  document-worker:
+    build:
+      context: .
+      target: worker
+    command: ["npm", "run", "worker:documents"]
+    depends_on:
+      - redis
+      - postgres
+    environment:
+      DATABASE_URL: postgresql://postgres:postgres@postgres:5432/bookleaf?schema=public
+      REDIS_URL: redis://redis:6379
+      USE_MOCK_DATA: "false"
+      OPENAI_API_KEY: ${OPENAI_API_KEY:-}
+
+  escalation-worker:
+    build:
+      context: .
+      target: worker
+    command: ["npm", "run", "worker:escalations"]
+    depends_on:
+      - redis
+    environment:
+      REDIS_URL: redis://redis:6379
+      SUPPORT_QUEUE_WEBHOOK_URL: ${SUPPORT_QUEUE_WEBHOOK_URL:-}
+
+volumes:
+  postgres_data:
+  redis_data:

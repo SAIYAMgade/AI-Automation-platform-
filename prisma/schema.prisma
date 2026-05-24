@@ -1,0 +1,283 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum Channel {
+  EMAIL
+  WHATSAPP
+  INSTAGRAM
+  DASHBOARD
+  API
+  SLACK
+
+  @@map("channel")
+}
+
+enum QueryIntent {
+  BOOK_STATUS
+  ROYALTY_STATUS
+  AUTHOR_COPY
+  ISBN_STATUS
+  ADDON_STATUS
+  SALES_REPORT
+  TIMELINE_QUERY
+  DASHBOARD_ACCESS
+  COMPANY_INFO
+  KNOWLEDGE_BASE
+  UNKNOWN
+
+  @@map("query_intent")
+}
+
+enum ConversationStatus {
+  OPEN
+  RESOLVED
+  ESCALATED
+  WAITING_FOR_AUTHOR
+
+  @@map("conversation_status")
+}
+
+enum EscalationStatus {
+  OPEN
+  ACKNOWLEDGED
+  RESOLVED
+  DISMISSED
+
+  @@map("escalation_status")
+}
+
+enum EscalationPriority {
+  LOW
+  MEDIUM
+  HIGH
+  URGENT
+
+  @@map("escalation_priority")
+}
+
+enum MessageRole {
+  USER
+  ASSISTANT
+  SYSTEM
+  HUMAN_AGENT
+
+  @@map("message_role")
+}
+
+enum IdentityType {
+  EMAIL
+  PHONE
+  INSTAGRAM
+  NAME
+  DASHBOARD_USER_ID
+  EXTERNAL_ID
+
+  @@map("identity_type")
+}
+
+model Author {
+  id                 String           @id @default(uuid()) @db.Uuid
+  fullName           String           @map("full_name")
+  email              String?          @unique
+  phone              String?          @unique
+  instagramHandle    String?          @unique @map("instagram_handle")
+  dashboardUserId    String?          @unique @map("dashboard_user_id")
+  locale             String           @default("en-IN")
+  identityConfidence Float            @default(1) @map("identity_confidence")
+  metadata           Json             @default("{}")
+  createdAt          DateTime         @default(now()) @map("created_at")
+  updatedAt          DateTime         @updatedAt @map("updated_at")
+  books              Book[]
+  conversations      Conversation[]
+  escalations        Escalation[]
+  identities         AuthorIdentity[]
+  supportLogs        SupportLog[]
+
+  @@index([fullName])
+  @@map("authors")
+}
+
+model AppUser {
+  id           String   @id @default(uuid()) @db.Uuid
+  email        String   @unique
+  passwordHash String   @map("password_hash")
+  role         String
+  displayName  String?  @map("display_name")
+  authorId     String?  @map("author_id") @db.Uuid
+  createdAt    DateTime @default(now()) @map("created_at")
+  updatedAt    DateTime @updatedAt @map("updated_at")
+
+  @@index([role])
+  @@map("app_users")
+}
+
+model AuthorIdentity {
+  id              String       @id @default(uuid()) @db.Uuid
+  authorId        String       @map("author_id") @db.Uuid
+  author          Author       @relation(fields: [authorId], references: [id], onDelete: Cascade)
+  type            IdentityType
+  value           String
+  normalizedValue String       @map("normalized_value")
+  confidence      Float        @default(1)
+  verified        Boolean      @default(false)
+  source          Channel
+  createdAt       DateTime     @default(now()) @map("created_at")
+
+  @@index([type, normalizedValue])
+  @@map("author_identities")
+}
+
+model Book {
+  id                  String    @id @default(uuid()) @db.Uuid
+  authorId            String    @map("author_id") @db.Uuid
+  author              Author    @relation(fields: [authorId], references: [id], onDelete: Cascade)
+  title               String
+  status              String    @default("IN_PRODUCTION")
+  isbn                String?   @unique
+  royaltyStatus       String    @default("NOT_DUE") @map("royalty_status")
+  royaltyAmountDue    Decimal   @default(0) @map("royalty_amount_due") @db.Decimal(12, 2)
+  royaltyPayoutDate   DateTime? @map("royalty_payout_date")
+  addOnServices       Json      @default("{}") @map("add_on_services")
+  finalSubmissionDate DateTime? @map("final_submission_date")
+  bookLiveDate        DateTime? @map("book_live_date")
+  authorCopyStatus    String    @default("NOT_DISPATCHED") @map("author_copy_status")
+  authorCopyTracking  String?   @map("author_copy_tracking")
+  prPackageStatus     String    @default("NOT_STARTED") @map("pr_package_status")
+  dashboardStatus     String    @default("ACTIVE") @map("dashboard_status")
+  salesReportUrl      String?   @map("sales_report_url")
+  metadata            Json      @default("{}")
+  createdAt           DateTime  @default(now()) @map("created_at")
+  updatedAt           DateTime  @updatedAt @map("updated_at")
+
+  @@index([authorId])
+  @@index([title])
+  @@map("books")
+}
+
+model Conversation {
+  id               String             @id @default(uuid()) @db.Uuid
+  authorId         String?            @map("author_id") @db.Uuid
+  author           Author?            @relation(fields: [authorId], references: [id], onDelete: SetNull)
+  channel          Channel
+  externalThreadId String?            @map("external_thread_id")
+  status           ConversationStatus @default(OPEN)
+  summary          String?
+  metadata         Json               @default("{}")
+  createdAt        DateTime           @default(now()) @map("created_at")
+  updatedAt        DateTime           @updatedAt @map("updated_at")
+  messages         Message[]
+  supportLogs      SupportLog[]
+  escalations      Escalation[]
+
+  @@index([channel, externalThreadId])
+  @@index([authorId])
+  @@map("conversations")
+}
+
+model Message {
+  id             String        @id @default(uuid()) @db.Uuid
+  conversationId String        @map("conversation_id") @db.Uuid
+  conversation   Conversation  @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+  role           MessageRole
+  content        String
+  intent         QueryIntent?
+  aiConfidence   Float?        @map("ai_confidence")
+  metadata       Json          @default("{}")
+  createdAt      DateTime      @default(now()) @map("created_at")
+
+  @@index([conversationId, createdAt])
+  @@map("messages")
+}
+
+model SupportLog {
+  id                   String        @id @default(uuid()) @db.Uuid
+  requestId            String        @unique @map("request_id")
+  conversationId        String?       @map("conversation_id") @db.Uuid
+  conversation          Conversation? @relation(fields: [conversationId], references: [id], onDelete: SetNull)
+  authorId              String?       @map("author_id") @db.Uuid
+  author                Author?       @relation(fields: [authorId], references: [id], onDelete: SetNull)
+  channel               Channel
+  userQuery             String        @map("user_query")
+  aiResponse            String?       @map("ai_response")
+  intent                QueryIntent
+  confidence            Float
+  retrievedDocumentIds  String[]      @default([]) @map("retrieved_document_ids")
+  latencyMs             Int           @map("latency_ms")
+  failureReason         String?       @map("failure_reason")
+  requiresHuman         Boolean       @default(false) @map("requires_human")
+  metadata              Json          @default("{}")
+  createdAt             DateTime      @default(now()) @map("created_at")
+
+  @@index([channel, createdAt])
+  @@index([intent, createdAt])
+  @@index([requiresHuman, createdAt])
+  @@map("support_logs")
+}
+
+model Escalation {
+  id             String             @id @default(uuid()) @db.Uuid
+  conversationId String?            @map("conversation_id") @db.Uuid
+  conversation   Conversation?      @relation(fields: [conversationId], references: [id], onDelete: SetNull)
+  authorId       String?            @map("author_id") @db.Uuid
+  author         Author?            @relation(fields: [authorId], references: [id], onDelete: SetNull)
+  reason         String
+  status         EscalationStatus   @default(OPEN)
+  priority       EscalationPriority @default(MEDIUM)
+  assignedTo     String?            @map("assigned_to")
+  payload        Json               @default("{}")
+  createdAt      DateTime           @default(now()) @map("created_at")
+  updatedAt      DateTime           @updatedAt @map("updated_at")
+  resolvedAt     DateTime?          @map("resolved_at")
+
+  @@index([status, priority, createdAt])
+  @@map("escalations")
+}
+
+model KnowledgeDocument {
+  id        String           @id @default(uuid()) @db.Uuid
+  title     String
+  source    String
+  category  String
+  checksum  String           @unique
+  metadata  Json             @default("{}")
+  createdAt DateTime         @default(now()) @map("created_at")
+  chunks    KnowledgeChunk[]
+
+  @@index([category])
+  @@map("knowledge_documents")
+}
+
+model KnowledgeChunk {
+  id             String            @id @default(uuid()) @db.Uuid
+  documentId     String            @map("document_id") @db.Uuid
+  document       KnowledgeDocument @relation(fields: [documentId], references: [id], onDelete: Cascade)
+  content        String
+  embedding      Unsupported("vector(1536)")?
+  embeddingModel String            @default("text-embedding-3-small") @map("embedding_model")
+  tokenCount     Int               @default(0) @map("token_count")
+  metadata       Json              @default("{}")
+  createdAt      DateTime          @default(now()) @map("created_at")
+
+  @@index([documentId])
+  @@map("knowledge_chunks")
+}
+
+model WebhookEvent {
+  id          String   @id @default(uuid()) @db.Uuid
+  channel     Channel
+  externalId  String   @map("external_id")
+  payload     Json
+  processedAt DateTime? @map("processed_at")
+  failedAt    DateTime? @map("failed_at")
+  error        String?
+  createdAt   DateTime @default(now()) @map("created_at")
+
+  @@unique([channel, externalId])
+  @@map("webhook_events")
+}
