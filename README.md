@@ -1,155 +1,175 @@
-# BookLeaf AI Query Automation Platform
+# BookLeaf AI Support Platform
 
-Production-grade full-stack AI support automation for BookLeaf author operations. It combines intent detection, Supabase structured lookup, RAG over publishing knowledge, confidence-based human escalation, multi-channel adapters, observability, queues, and an enterprise operator console.
+## Live demo
 
-## 1. System Architecture Overview
+### [Open the live BookLeaf platform](https://ai-automation-platform-e6qi.onrender.com/login)
 
-BookLeaf uses a modular monolith: Next.js 15 hosts the dashboard and canonical `/api/*` routes, while an Express adapter exposes the same services for Helmet/CORS middleware, worker-adjacent deployments, and Supertest coverage. This keeps early-stage deployment simple while preserving clean service boundaries.
+BookLeaf is a full-stack AI support platform for publishing operations. It combines grounded AI answers, author-specific records, Supabase/pgvector retrieval, identity matching, streaming chat, analytics, and human escalation in one responsive workspace.
 
-See [docs/architecture.md](docs/architecture.md) for the Mermaid diagram and scaling notes.
+> Demo login: `sara.johnson@gmail.com` / `bookleaf123`
+>
+> Admin demo: `admin@bookleaf.com` / `bookleaf123`
 
-For the AI Automation Specialist assignment checklist, see [docs/technical-assignment-compliance.md](docs/technical-assignment-compliance.md).
+## What it does
 
-## 2. Folder Structure
+- Answers author questions about publishing timelines, ISBNs, royalties, author copies, services, and pricing.
+- Separates general BookLeaf knowledge from private author and book records.
+- Uses confidence thresholds and grounding checks to prevent unsupported answers.
+- Escalates uncertain, ambiguous, or missing-data requests to human support.
+- Streams responses in the author portal and operator console.
+- Supports Supabase, PostgreSQL/Prisma, Redis/BullMQ, OpenAI, and local mock mode.
+- Includes customer, company-admin, analytics, escalation, ingestion, and multi-channel foundations.
 
-```txt
-src/
-  ai/                 OpenAI/LangChain clients, prompts, intent and response generation
-  app/                Next.js App Router UI and REST API routes
-  components/         SaaS dashboard and ShadCN-style UI primitives
-  db/                 Prisma, Supabase, mock/runtime data
-  hooks/              Streaming chat client logic
-  lib/                env, auth, logging, security, API responses
-  rag/                chunking, embeddings, pgvector retrieval, ingestion
-  server/             Express adapter for Helmet/CORS and Supertest
-  services/           orchestration, identity, escalation, analytics, queues, channels
-  store/              Zustand UI state
-  types/              Shared API/domain/AI contracts
-  workers/            BullMQ document and escalation workers
-tests/                Jest unit and API tests
-prisma/               Prisma schema and seed
-supabase/             pgvector schema, RPC, mock data
-docs/                 Architecture and deployment guides
+## Grounded AI architecture
+
+```text
+Author message
+      |
+      v
+Intent + entity extraction
+      |
+      +--> Author identity match --> Relational author/book records
+      |
+      +--> General policy question --> RAG / Supabase pgvector
+      |
+      v
+Grounding gate + confidence check
+      |
+      +--> Verified answer
+      |
+      +--> Escalation ticket + human-support fallback
 ```
 
-## 3. Database Schema
+The platform deliberately keeps these retrieval tracks separate:
 
-Core tables:
+- General policies, pricing, publishing workflows, and service descriptions come from the knowledge base.
+- ISBNs, royalty status, publishing dates, copy shipment details, and other account facts come from structured author/book records.
+- If the required source does not contain a sufficiently grounded answer, the system escalates instead of guessing.
 
-- `authors`, `author_identities`, `books`
-- `conversations`, `messages`, `support_logs`
-- `escalations`
-- `knowledge_documents`, `knowledge_chunks`
-- `webhook_events`
+## Tech stack
 
-`supabase/schema.sql` enables `pgvector`, creates an HNSW vector index, and adds `match_knowledge_chunks()` for semantic retrieval. Prisma owns transactional application models in `prisma/schema.prisma`.
+| Area | Technology |
+| --- | --- |
+| Web app | Next.js 15, React 19, TypeScript, Tailwind CSS |
+| AI | OpenAI, LangChain, structured intent classification |
+| Retrieval | Supabase, PostgreSQL, pgvector, embeddings |
+| Data layer | Prisma, Supabase service client, runtime mock store |
+| Async work | Redis, BullMQ, document and escalation workers |
+| UI | Responsive author portal, operator console, Framer Motion |
+| Testing | Jest, Supertest, TypeScript, ESLint |
+| Deployment | Render/Vercel-compatible Next.js deployment |
 
-## 4. Backend Setup
+## Run locally
 
 ```bash
 npm install
-cp .env.example .env
+copy .env.example .env.local
 npm run db:generate
 npm run dev
 ```
 
-The app runs in safe mock mode by default. Set `USE_MOCK_DATA=false` with real `DATABASE_URL`, Supabase credentials, Redis, and OpenAI keys for production behavior.
+Open [http://localhost:3000/login](http://localhost:3000/login).
 
-## 5. AI Pipeline
+The default development mode is safe mock mode, so the demo login and sample author records work without external credentials. For production integrations, set:
 
-`src/ai/intent-engine.ts` classifies:
-
-- intent
-- confidence
-- entities
-- ambiguity
-- escalation need
-
-It uses OpenAI structured output when configured and deterministic fallback logic for local tests. `src/ai/response-generator.ts` uses a grounded system prompt that forbids hallucinated dates, ISBNs, tracking IDs, payments, and statuses.
-
-## 6. RAG Pipeline
-
-`POST /api/ingest-documents` accepts knowledge documents, chunks them with LangChain, embeds them with OpenAI embeddings, and stores vectors in Supabase pgvector. Retrieval flow:
-
-```txt
-query -> embedding -> pgvector top-k -> context injection -> grounded answer
+```env
+USE_MOCK_DATA=false
+DATABASE_URL=your-postgres-or-supabase-connection-string
+NEXT_PUBLIC_SUPABASE_URL=https://your-project.supabase.co
+NEXT_PUBLIC_SUPABASE_ANON_KEY=your-anon-key
+SUPABASE_SERVICE_ROLE_KEY=your-server-only-service-role-key
+OPENAI_API_KEY=your-openai-key
+REDIS_URL=your-redis-url
 ```
 
-Redis caches retrieval results to reduce repeated embedding/vector calls.
+Never expose `SUPABASE_SERVICE_ROLE_KEY` or `OPENAI_API_KEY` in browser code.
 
-## 7. Frontend Implementation
+## Supabase setup
 
-The dashboard resembles an Intercom/Zendesk-style AI console:
+Run [supabase/schema.sql](supabase/schema.sql) in the Supabase SQL Editor. It creates:
 
-- streaming AI responses
-- conversation history
-- channel selector
-- confidence and latency telemetry
-- retrieved document panel
-- escalation badges
-- responsive layout
-- dark mode
-- Zustand state management
-- Framer Motion message transitions
+- authors, identities, app users, and books
+- conversations, messages, support logs, and escalations
+- knowledge documents and vector chunks
+- LangChain-compatible `bookleaf_kb_chunks`
+- `match_knowledge_chunks()` and `match_bookleaf_kb()` RPC functions
+- structured `author_books` and `support_tickets`
+- service-role RLS policies
 
-## 8. API Implementation
+The SQL keeps general knowledge-base content separate from private per-author facts.
 
-Canonical Next.js routes:
+## Project structure
 
-- `POST /api/chat`
-- `POST /api/escalate`
-- `POST /api/ingest-documents`
-- `GET /api/conversations`
-- `GET /api/analytics`
-
-The Express adapter in `src/server/express-app.ts` exposes the same routes for tests and non-Vercel deployments.
-
-## 9. Logging & Monitoring
-
-Pino emits structured logs. Sentry is initialized through `instrumentation.ts`. Support logs persist:
-
-- query
-- response
-- confidence
-- intent
-- retrieved document IDs
-- latency
-- failure/escalation reason
-
-## 10. Escalation Engine
-
-The orchestrator escalates when:
-
-- confidence is below threshold
-- intent is unknown
-- identity has no match or multiple matches
-- author/book records are ambiguous
-- database facts are inconsistent
-
-Escalations are written to storage and pushed to BullMQ for support queue notification.
-
-## 11. Docker Setup
-
-```bash
-docker compose up --build
+```text
+src/
+  ai/                 Intent engine, prompts, OpenAI clients, response generation
+  app/                Next.js pages and API routes
+  components/         Author portal, operator console, auth, and UI primitives
+  db/                 Prisma, Supabase, mock data, runtime store
+  hooks/              Streaming chat hooks
+  rag/                Chunking, embeddings, ingestion, and retrieval
+  services/           Auth, identity, orchestration, escalation, analytics, queues
+  server/             Express adapter for tests and worker-adjacent deployments
+  workers/            Document-ingestion and escalation workers
+  types/              Shared API, AI, domain, and orchestration contracts
+supabase/             PostgreSQL/pgvector schema and mock data
+prisma/               Prisma schema and seed data
+tests/                Intent, identity, and API tests
+docs/                 Architecture, deployment, and knowledge-base notes
 ```
 
-Compose starts Postgres with pgvector, Redis, the Next.js app, and two workers.
+## API routes
 
-## 12. Deployment
+| Method | Route | Purpose |
+| --- | --- | --- |
+| POST | `/api/auth` | Sign in or create an account |
+| POST | `/api/chat` | Run grounded support automation |
+| POST | `/api/escalate` | Create a manual-support escalation |
+| POST | `/api/ingest-documents` | Ingest and embed knowledge documents |
+| GET | `/api/conversations` | Read conversation history and work queues |
+| GET | `/api/analytics` | Read support and automation metrics |
 
-Deploy Next.js to Vercel. Run BullMQ workers on Railway or Render. Use Supabase hosted Postgres with `supabase/schema.sql`. Full instructions are in [docs/deployment.md](docs/deployment.md).
-
-## 13. Testing
+## Useful commands
 
 ```bash
-npm run test
-npm run lint
+npm run dev             # Start Next.js development server
+npm run build           # Create a production build
+npm run start           # Start the production server
+npm run typecheck       # Run TypeScript validation
+npm run lint            # Run ESLint
+npm test                # Run the Jest test suite
+npm run db:generate     # Generate Prisma client
+npm run db:push         # Push Prisma schema to the configured database
+npm run worker:documents
+npm run worker:escalations
+```
+
+## Deployment
+
+The current live deployment is available at:
+
+**[https://ai-automation-platform-e6qi.onrender.com/login](https://ai-automation-platform-e6qi.onrender.com/login)**
+
+For a production deployment, configure the environment variables above, run the Supabase schema, provision Redis for BullMQ, and deploy the Next.js web process alongside the document and escalation workers. See [docs/deployment.md](docs/deployment.md) for the deployment checklist.
+
+## Documentation
+
+- [Architecture](docs/architecture.md)
+- [Deployment](docs/deployment.md)
+- [BookLeaf knowledge base](docs/bookleaf-knowledge-base.md)
+- [Technical assignment compliance](docs/technical-assignment-compliance.md)
+- [Loom video script](docs/loom-video-script.md)
+
+## Verification
+
+The repository includes tests for intent classification, identity unification, API behavior, grounded retrieval, and escalation behavior.
+
+```bash
 npm run typecheck
+npm run lint
+npm test -- --runInBand
 ```
 
-Tests cover intent classification, identity matching, and API behavior through Supertest.
+## License
 
-## 14. README Notes
-
-This is intentionally not a toy CRUD app. The code is structured so the first production iteration can run as a modular monolith, then split into independent services once traffic, team ownership, or channel-specific SLAs justify it.
+This project is private and intended for BookLeaf platform development.
