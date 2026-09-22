@@ -11,7 +11,7 @@ export class ResponseGenerator {
     classification: IntentClassification;
     context: GroundingContext;
   }): Promise<GeneratedAnswer> {
-    const model = createChatModel({ temperature: 0.2 });
+    const model = createChatModel({ temperature: 0 });
 
     if (!model) {
       return this.fallbackAnswer(input);

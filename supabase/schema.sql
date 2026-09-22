@@ -247,3 +247,69 @@ create policy "service role has full access to support_logs" on support_logs for
 create policy "service role has full access to escalations" on escalations for all using (auth.role() = 'service_role') with check (auth.role() = 'service_role');
 create policy "service role has full access to knowledge_documents" on knowledge_documents for all using (auth.role() = 'service_role') with check (auth.role() = 'service_role');
 create policy "service role has full access to knowledge_chunks" on knowledge_chunks for all using (auth.role() = 'service_role') with check (auth.role() = 'service_role');
+
+-- Optional LangChain-compatible knowledge-base tables.
+-- Keep general policy/service content here; author-specific facts stay in
+-- author_books (or the existing authors/books relational tables).
+create table if not exists bookleaf_kb_chunks (
+  id bigserial primary key,
+  source text,
+  content text not null,
+  embedding vector(1536) not null,
+  created_at timestamptz not null default now()
+);
+
+create index if not exists bookleaf_kb_chunks_embedding_idx
+  on bookleaf_kb_chunks
+  using ivfflat (embedding vector_cosine_ops)
+  with (lists = 100);
+
+create or replace function match_bookleaf_kb(
+  query_embedding vector(1536),
+  match_count integer default 4
+)
+returns table (
+  id bigint,
+  content text,
+  similarity double precision
+)
+language sql
+stable
+as $$
+  select
+    id,
+    content,
+    1 - (embedding <=> query_embedding) as similarity
+  from bookleaf_kb_chunks
+  order by embedding <=> query_embedding
+  limit match_count;
+$$;
+
+create table if not exists author_books (
+  account_id uuid primary key references auth.users(id) on delete cascade,
+  book_title text,
+  isbn_status text,
+  publish_date date,
+  royalty_status text,
+  copies_status text
+);
+
+create table if not exists support_tickets (
+  id bigserial primary key,
+  account_id uuid,
+  query text not null,
+  reason text not null,
+  status text not null default 'open',
+  created_at timestamptz not null default now()
+);
+
+alter table bookleaf_kb_chunks enable row level security;
+alter table author_books enable row level security;
+alter table support_tickets enable row level security;
+
+create policy "service role has full access to bookleaf_kb_chunks" on bookleaf_kb_chunks
+  for all using (auth.role() = 'service_role') with check (auth.role() = 'service_role');
+create policy "service role has full access to author_books" on author_books
+  for all using (auth.role() = 'service_role') with check (auth.role() = 'service_role');
+create policy "service role has full access to support_tickets" on support_tickets
+  for all using (auth.role() = 'service_role') with check (auth.role() = 'service_role');

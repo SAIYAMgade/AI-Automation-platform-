@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { AnimatePresence, motion } from "framer-motion";
 import { BookOpenText, Bot, Building2, LogOut, Send } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { OriginButton } from "@/components/ui/origin-button";
 import { Badge } from "@/components/ui/badge";
 import { Textarea } from "@/components/ui/textarea";
 import { ScrollArea } from "@/components/ui/scroll-area";
@@ -255,10 +256,10 @@ export function CustomerPortal() {
               disabled={isStreaming}
             />
             <div className="flex justify-end">
-              <Button type="submit" disabled={isStreaming || draft.trim().length < 2}>
+              <OriginButton type="submit" disabled={isStreaming || draft.trim().length < 2}>
                 <Send className="h-4 w-4" />
                 Ask BookLeaf
-              </Button>
+              </OriginButton>
             </div>
           </div>
         </form>

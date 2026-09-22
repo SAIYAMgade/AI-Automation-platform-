@@ -34,7 +34,12 @@ export class QueryOrchestrator {
 
     const author = identity.authorId ? await authorService.getAuthor(identity.authorId) : null;
     const retrievedDocuments = await retrievalService.retrieve(query, 5);
-    const escalationReason = determineEscalationReason(classification, identity.status, author);
+    const escalationReason = determineEscalationReason(
+      classification,
+      identity.status,
+      author,
+      retrievedDocuments.length,
+    );
     const requiresHuman = escalationReason !== null;
 
     const conversation = await conversationService.upsertConversation({
@@ -167,6 +172,7 @@ function determineEscalationReason(
   classification: Awaited<ReturnType<typeof intentEngine.classify>>,
   identityStatus: string,
   author: AuthorRecord | null,
+  retrievedDocumentCount: number,
 ) {
   if (classification.confidence < env.AI_CONFIDENCE_THRESHOLD) {
     return classification.escalation_reason ?? "AI confidence is below the automation threshold.";
@@ -174,6 +180,10 @@ function determineEscalationReason(
 
   if (classification.intent === "UNKNOWN" || classification.requires_human) {
     return classification.escalation_reason ?? "The query intent is unclear or outside supported automation paths.";
+  }
+
+  if (requiresKnowledgeBase(classification.intent) && retrievedDocumentCount === 0) {
+    return "No sufficiently relevant BookLeaf knowledge-base content was found.";
   }
 
   if (!requiresAuthorIdentity(classification.intent)) {
@@ -210,6 +220,10 @@ function determineEscalationReason(
   }
 
   return null;
+}
+
+function requiresKnowledgeBase(intent: string) {
+  return ["COMPANY_INFO", "KNOWLEDGE_BASE"].includes(intent);
 }
 
 function requiresAuthorIdentity(intent: string) {

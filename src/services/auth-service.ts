@@ -16,7 +16,26 @@ type RuntimeUser = {
   createdAt: string;
 };
 
-const runtimeUsers: RuntimeUser[] = [];
+// Local development intentionally works without a database. Keep demo users
+// available so a fresh checkout can be opened and tested immediately.
+const runtimeUsers: RuntimeUser[] = [
+  {
+    id: "demo-customer",
+    email: "sara.johnson@gmail.com",
+    passwordHash: hashPassword("bookleaf123"),
+    role: "customer",
+    displayName: "Sara Johnson",
+    createdAt: new Date().toISOString(),
+  },
+  {
+    id: "demo-company",
+    email: "admin@bookleaf.com",
+    passwordHash: hashPassword("bookleaf123"),
+    role: "company",
+    displayName: "BookLeaf Admin",
+    createdAt: new Date().toISOString(),
+  },
+];
 
 export class AuthService {
   async signUp(input: { email: string; password: string; role: Role }) {

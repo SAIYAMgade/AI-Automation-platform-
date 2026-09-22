@@ -71,22 +71,27 @@ function scoreAuthor(
   let score = 0;
   const signals = 0.0001;
 
-  if (identity.email && normalizeEmail(author.email ?? undefined) === normalizeEmail(identity.email)) {
+  const exactEmail = Boolean(identity.email && normalizeEmail(author.email ?? undefined) === normalizeEmail(identity.email));
+  const exactPhone = Boolean(identity.phone && normalizePhone(author.phone ?? undefined) === normalizePhone(identity.phone));
+  const exactInstagram = Boolean(
+    identity.instagramHandle &&
+      normalizeInstagram(author.instagramHandle ?? undefined) === normalizeInstagram(identity.instagramHandle),
+  );
+  const exactDashboardId = Boolean(identity.dashboardUserId && author.dashboardUserId === identity.dashboardUserId);
+
+  if (exactEmail) {
     score += 0.45;
   }
 
-  if (identity.phone && normalizePhone(author.phone ?? undefined) === normalizePhone(identity.phone)) {
+  if (exactPhone) {
     score += 0.35;
   }
 
-  if (
-    identity.instagramHandle &&
-    normalizeInstagram(author.instagramHandle ?? undefined) === normalizeInstagram(identity.instagramHandle)
-  ) {
+  if (exactInstagram) {
     score += 0.4;
   }
 
-  if (identity.dashboardUserId && author.dashboardUserId === identity.dashboardUserId) {
+  if (exactDashboardId) {
     score += 0.45;
   }
 
@@ -109,6 +114,12 @@ function scoreAuthor(
 
   if (!identity.email && !identity.phone && !identity.instagramHandle && !identity.dashboardUserId) {
     score *= 0.85;
+  }
+
+  // An exact authenticated identifier is stronger than a fuzzy name/title
+  // match. Without this floor, a valid email scored below the review cutoff.
+  if (exactEmail || exactPhone || exactInstagram || exactDashboardId) {
+    score = Math.max(score, 0.9);
   }
 
   return Math.min(0.99, Math.max(signals, score));
